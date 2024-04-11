@@ -8,7 +8,7 @@ covid_folder = os.path.join(ct_folder, 'COVID')
 noncovid_folder = os.path.join(ct_folder, 'nonCOVID')
 
 # 定义目标文件夹路径
-covid_tr_folder = '.data/CT/COVID_tr'
+covid_tr_folder = './data/CT/COVID_tr'
 covid_ts_folder = './data/CT/COVID_ts'
 noncovid_tr_folder = './data/CT/nonCOVID_tr'
 noncovid_ts_folder = './data/CT/nonCOVID_ts'
