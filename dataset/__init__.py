@@ -1,3 +1,4 @@
+from .CT import CT
 from .cars import Cars
 from .cub import CUBirds
 from .SOP import SOP
@@ -8,7 +9,8 @@ from .base import BaseDataset
 _type = {
     'cars': Cars,
     'cub': CUBirds,
-    'SOP': SOP
+    'SOP': SOP,
+    'CT' : CT
 }
 
 def load(name, root, mode, transform = None):

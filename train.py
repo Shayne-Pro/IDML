@@ -23,14 +23,14 @@ parser.add_argument('--LOG_DIR',
     help = 'Path to log folder'
 )
 parser.add_argument('--dataset', 
-    default='cub',
+    default='CT',
     help = 'Training dataset, e.g. cub, cars, SOP'
 )
 parser.add_argument('--embedding-size', default = 512, type = int,
     dest = 'sz_embedding',
     help = 'Size of embedding that is appended to backbone model.'
 )
-parser.add_argument('--batch-size', default = 150, type = int,
+parser.add_argument('--batch-size', default = 50, type = int,
     dest = 'sz_batch',
     help = 'Number of samples per batch.'
 )
@@ -41,7 +41,7 @@ parser.add_argument('--epochs', default = 60, type = int,
 parser.add_argument('--gpu-id', default = 0, type = int,
     help = 'ID of GPU that is used for training.'
 )
-parser.add_argument('--workers', default = 4, type = int,
+parser.add_argument('--workers', default = 1, type = int,
     dest = 'nb_workers',
     help = 'Number of workers for dataloader.'
 )
@@ -100,7 +100,7 @@ LOG_DIR = args.LOG_DIR + '/logs_{}/{}_{}_embedding{}_alpha{}_mrg{}_{}_lr{}_batch
 wandb.init(project=args.dataset + '_ProxyAnchor', notes=LOG_DIR)
 wandb.config.update(args)
 
-os.chdir('../data/')
+os.chdir('data/')
 data_root = os.getcwd()
 # Dataset Loader and Sampler
 trn_dataset = dataset.load(
@@ -118,6 +118,7 @@ if args.IPC:
     dl_tr = torch.utils.data.DataLoader(
         trn_dataset,
         num_workers = args.nb_workers,
+        #num_workers = 0,
         pin_memory = True,
         batch_sampler = batch_sampler
     )
@@ -129,6 +130,7 @@ else:
         batch_size = args.sz_batch,
         shuffle = True,
         num_workers = args.nb_workers,
+        #num_workers = 0,
         drop_last = True,
         pin_memory = True
     )
@@ -149,6 +151,7 @@ dl_ev = torch.utils.data.DataLoader(
     batch_size = args.sz_batch,
     shuffle = False,
     num_workers = args.nb_workers,
+    #num_workers = 0,
     pin_memory = True
 )
 
@@ -196,8 +199,10 @@ if args.loss == 'Proxy_Anchor':
 def mixup(x, y, alpha):
     batch_size = x.size()[0]
     lam = np.random.beta(alpha, alpha)
-
-    index = torch.randperm(batch_size).cuda()
+    if x.is_cuda:
+        index = torch.randperm(batch_size).cuda()
+    else:
+        index = torch.randperm(batch_size)
 
     mixed_x = lam*x + (1-lam)*x[index,:]
     y_a, y_b = y, y[index]
@@ -249,7 +254,9 @@ for epoch in range(0, args.nb_epochs):
 
     pbar = tqdm(enumerate(dl_tr))
 
-    for batch_idx, (x, y) in pbar:                         
+    for batch_idx, (x, y) in pbar:
+        x = x.cuda()
+        y = y.cuda()                         
         mixed_x, y_1, y_2, lam = mixup(x, y, 1.0)
         m, v = model(x.squeeze().cuda())
         mixed_m, mixed_v = model(mixed_x.squeeze().cuda())

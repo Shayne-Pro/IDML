@@ -16,6 +16,8 @@ class BaseDataset(torch.utils.data.Dataset):
         self.ys, self.im_paths, self.I = [], [], []
 
     def nb_classes(self):
+        print("ys:",set(self.ys))
+        print("classes:",set(self.classes))
         assert set(self.ys) == set(self.classes)
         return len(self.classes)
 
