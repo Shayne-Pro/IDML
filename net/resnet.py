@@ -10,6 +10,7 @@ from torchvision.models import resnet34
 from torchvision.models import resnet50
 from torchvision.models import resnet101
 import torch.utils.model_zoo as model_zoo
+from .kan import KANLinear
 
 class Resnet18(nn.Module):
     def __init__(self,embedding_size, pretrained=True, is_norm=True, bn_freeze = True):
@@ -145,7 +146,9 @@ class Resnet50(nn.Module):
         self.model.gmp = nn.AdaptiveMaxPool2d(1)
 
         self.model.embedding = nn.Linear(self.num_ftrs, self.embedding_size)
+        self.model.embedding2 = KANLinear(in_features = self.num_ftrs, out_features = self.embedding_size)
         self.model.uncertainty = nn.Linear(self.num_ftrs, self.embedding_size)
+        self.model.uncertainty2 = KANLinear(in_features = self.num_ftrs, out_features = self.embedding_size)
         self._initialize_weights()
 
         if bn_freeze:
@@ -183,8 +186,8 @@ class Resnet50(nn.Module):
 
         x = max_x + avg_x
         x = x.view(x.size(0), -1)
-        x_semantic = self.model.embedding(x)
-        x_uncertainty = self.model.uncertainty(x)
+        x_semantic = self.model.embedding2(x)
+        x_uncertainty = self.model.uncertainty2(x)
         
         if self.is_norm:
             x_semantic = self.l2_norm(x_semantic)

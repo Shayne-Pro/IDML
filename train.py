@@ -268,7 +268,7 @@ for epoch in range(0, args.nb_epochs):
         opt.zero_grad()
         loss.backward()
         
-        torch.nn.utils.clip_grad_value_(model.parameters(), 10)
+        # torch.nn.utils.clip_grad_value_(model.parameters(), 10)
         if args.loss == 'Proxy_Anchor':
             torch.nn.utils.clip_grad_value_(criterion.parameters(), 10)
 
