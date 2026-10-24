@@ -23,7 +23,7 @@ parser.add_argument('--LOG_DIR',
     help = 'Path to log folder'
 )
 parser.add_argument('--dataset', 
-    default='CT',
+    default='CT', choices=('CT', 'cub', 'cars', 'SOP'),
     help = 'Training dataset, e.g. cub, cars, SOP'
 )
 parser.add_argument('--embedding-size', default = 512, type = int,
@@ -45,7 +45,7 @@ parser.add_argument('--workers', default = 1, type = int,
     dest = 'nb_workers',
     help = 'Number of workers for dataloader.'
 )
-parser.add_argument('--model', default = 'resnet50',
+parser.add_argument('--model', default = 'resnet50', choices=('resnet18', 'resnet50', 'resnet101'),
     help = 'Model for training'
 )
 parser.add_argument('--loss', default = 'Proxy_Anchor',
@@ -88,6 +88,7 @@ parser.add_argument('--remark', default = '',
     help = 'Any reamrk'
 )
 
+parser.add_argument('--data-root', default=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data'), help='Parent of CT, CUB_200_2011, cars196, or Stanford_Online_Products.')
 args = parser.parse_args()
 
 if args.gpu_id != -1:
@@ -100,8 +101,7 @@ LOG_DIR = args.LOG_DIR + '/logs_{}/{}_{}_embedding{}_alpha{}_mrg{}_{}_lr{}_batch
 wandb.init(project=args.dataset + '_ProxyAnchor', notes=LOG_DIR)
 wandb.config.update(args)
 
-os.chdir('./data/')
-data_root = os.getcwd()
+data_root = os.path.abspath(args.data_root)
 # Dataset Loader and Sampler
 trn_dataset = dataset.load(
         name = args.dataset,
@@ -158,16 +158,8 @@ dl_ev = torch.utils.data.DataLoader(
 nb_classes = trn_dataset.nb_classes()
 
 # Backbone Model
-if args.model.find('googlenet')+1:
-    model = googlenet(embedding_size=args.sz_embedding, pretrained=True, is_norm=args.l2_norm, bn_freeze = args.bn_freeze)
-elif args.model.find('bn_inception')+1:
-    model = bn_inception(embedding_size=args.sz_embedding, pretrained=True, is_norm=args.l2_norm, bn_freeze = args.bn_freeze)
-elif args.model.find('resnet18')+1:
-    model = Resnet18(embedding_size=args.sz_embedding, pretrained=True, is_norm=args.l2_norm, bn_freeze = args.bn_freeze)
-elif args.model.find('resnet50')+1:
-    model = Resnet50(embedding_size=args.sz_embedding, pretrained=True, is_norm=args.l2_norm, bn_freeze = args.bn_freeze)
-elif args.model.find('resnet101')+1:
-    model = Resnet101(embedding_size=args.sz_embedding, pretrained=True, is_norm=args.l2_norm, bn_freeze = args.bn_freeze)
+model_class = {'resnet18': Resnet18, 'resnet50': Resnet50, 'resnet101': Resnet101}[args.model]
+model = model_class(embedding_size=args.sz_embedding, pretrained=True, is_norm=args.l2_norm, bn_freeze=args.bn_freeze)
 model = model.cuda()
 
 if args.gpu_id == -1:

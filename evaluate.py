@@ -2,10 +2,7 @@ import torch, math, time, argparse, json, os, sys
 import random, dataset, utils, losses, net
 import numpy as np
 
-from dataset.Inshop import Inshop_Dataset
 from net.resnet import *
-from net.googlenet import *
-from net.bn_inception import *
 from dataset import sampler
 from torch.utils.data.sampler import BatchSampler
 from torch.utils.data.dataloader import default_collate
@@ -23,8 +20,8 @@ parser = argparse.ArgumentParser(description=
     'Official implementation of `IDML` on retrieval tasks'
 )
 parser.add_argument('--dataset', 
-    default='cub',
-    help = 'Training dataset, e.g. cub, cars, SOP, Inshop'
+    default='cub', choices=('CT', 'cub', 'cars', 'SOP'),
+    help = 'Evaluation dataset: CT, cub, cars, or SOP'
 )
 parser.add_argument('--embedding-size', default = 512, type = int,
     dest = 'sz_embedding',
@@ -41,7 +38,7 @@ parser.add_argument('--workers', default = 4, type = int,
     dest = 'nb_workers',
     help = 'Number of workers for dataloader.'
 )
-parser.add_argument('--model', default = 'bn_inception',
+parser.add_argument('--model', default = 'resnet50', choices=('resnet18', 'resnet50', 'resnet101'),
     help = 'Model for training'
 )
 parser.add_argument('--l2-norm', default = 1, type = int,
@@ -54,78 +51,37 @@ parser.add_argument('--remark', default = '',
     help = 'Any reamrk'
 )
 
+parser.add_argument('--data-root', default=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data'), help='Parent of CT, CUB_200_2011, cars196, or Stanford_Online_Products.')
 args = parser.parse_args()
 
 if args.gpu_id != -1:
     torch.cuda.set_device(args.gpu_id)
 
 # Data Root Directory
-os.chdir('../data/')
-data_root = os.getcwd()
+data_root = os.path.abspath(args.data_root)
     
 # Dataset Loader and Sampler
-if args.dataset != 'Inshop':
-    ev_dataset = dataset.load(
-            name = args.dataset,
-            root = data_root,
-            mode = 'eval',
-            transform = dataset.utils.make_transform(
-                is_train = False, 
-                is_inception = (args.model == 'bn_inception')
-            ))
+ev_dataset = dataset.load(
+        name = args.dataset,
+        root = data_root,
+        mode = 'eval',
+        transform = dataset.utils.make_transform(
+            is_train = False,
+            is_inception = (args.model == 'bn_inception')
+        ))
 
-    dl_ev = torch.utils.data.DataLoader(
-        ev_dataset,
-        batch_size = args.sz_batch,
-        shuffle = False,
-        num_workers = args.nb_workers,
-        pin_memory = True
-    )
-    
-else:
-    query_dataset = Inshop_Dataset(
-            root = data_root,
-            mode = 'query',
-            transform = dataset.utils.make_transform(
-                is_train = False, 
-                is_inception = (args.model == 'bn_inception')
-    ))
-    
-    dl_query = torch.utils.data.DataLoader(
-        query_dataset,
-        batch_size = args.sz_batch,
-        shuffle = False,
-        num_workers = args.nb_workers,
-        pin_memory = True
-    )
+dl_ev = torch.utils.data.DataLoader(
+    ev_dataset,
+    batch_size = args.sz_batch,
+    shuffle = False,
+    num_workers = args.nb_workers,
+    pin_memory = True
+)
 
-    gallery_dataset = Inshop_Dataset(
-            root = data_root,
-            mode = 'gallery',
-            transform = dataset.utils.make_transform(
-                is_train = False, 
-                is_inception = (args.model == 'bn_inception')
-    ))
-    
-    dl_gallery = torch.utils.data.DataLoader(
-        gallery_dataset,
-        batch_size = args.sz_batch,
-        shuffle = False,
-        num_workers = args.nb_workers,
-        pin_memory = True
-    )
 
 # Backbone Model
-if args.model.find('googlenet')+1:
-    model = googlenet(embedding_size=args.sz_embedding, pretrained=True, is_norm=args.l2_norm, bn_freeze = 1)
-elif args.model.find('bn_inception')+1:
-    model = bn_inception(embedding_size=args.sz_embedding, pretrained=True, is_norm=args.l2_norm, bn_freeze = 1)
-elif args.model.find('resnet18')+1:
-    model = Resnet18(embedding_size=args.sz_embedding, pretrained=True, is_norm=args.l2_norm, bn_freeze = 1)
-elif args.model.find('resnet50')+1:
-    model = Resnet50(embedding_size=args.sz_embedding, pretrained=True, is_norm=args.l2_norm, bn_freeze = 1)
-elif args.model.find('resnet101')+1:
-    model = Resnet101(embedding_size=args.sz_embedding, pretrained=True, is_norm=args.l2_norm, bn_freeze = 1)
+model_class = {'resnet18': Resnet18, 'resnet50': Resnet50, 'resnet101': Resnet101}[args.model]
+model = model_class(embedding_size=args.sz_embedding, pretrained=True, is_norm=args.l2_norm, bn_freeze=1)
 model = model.cuda()
 
 if args.gpu_id == -1:
@@ -141,10 +97,7 @@ else:
                     
 with torch.no_grad():
     print("**Evaluating...**")
-    if args.dataset == 'Inshop':
-        Recalls = utils.evaluate_cos_Inshop(model, dl_query, dl_gallery)
-
-    elif args.dataset != 'SOP':
+    if args.dataset != 'SOP':
         Recalls = utils.evaluate_cos(model, dl_ev)
 
     else:
